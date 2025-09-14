@@ -1,9 +1,16 @@
-phase: "02_INVENTORY"
+phase: "04_SIDECAR_INDEX"
 allowed_paths:
-  - tools/inventory.md
+  - PHASE.yml
+  - tools/check_phase.mjs
+  - .github/workflows/ci.yml
+  - packages/sidecar-index/**
+  - packages/file-core/src/indexer.ts
+  - packages/file-core/test/indexer.spec.ts
+  - tools/fixtures/**
+  - pnpm-workspace.yaml
 acceptance:
   - pnpm -w build
-  - pnpm -w lint
   - pnpm -w test
+  - pnpm -w lint
   - pnpm -w typecheck
 ts_strict_required: true
