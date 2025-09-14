@@ -1,22 +1,9 @@
-phase: "01_FORK_PREP"
+phase: "02_INVENTORY"
 allowed_paths:
-  - package.json
-  - pnpm-workspace.yaml
-  - tsconfig.base.json
-  - .eslintrc.cjs
-  - .prettierrc
-  - .github/workflows/**
-  - apps/legacy/**
-  - apps/**/.gitkeep
-  - packages/**/.gitkeep
-  - tools/**
+  - tools/inventory.md
 acceptance:
-  - pnpm i
   - pnpm -w build
   - pnpm -w lint
   - pnpm -w test
   - pnpm -w typecheck
-require_readonly_markers:
-  - apps/legacy/README.md
 ts_strict_required: true
-
