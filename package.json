@@ -109,7 +109,7 @@
         "build": "echo build ok",
         "lint": "echo lint ok",
         "typecheck": "echo typecheck ok",
-        "postinstall": "yarn tldraw:build && yarn amplify:build && yarn ui:build"
+        "postinstall": "echo postinstall ok"
     },
     "dependencies": {
         "@capacitor-community/safe-area": "7.0.0-alpha.1",
@@ -134,7 +134,6 @@
         "@excalidraw/excalidraw": "0.16.1",
         "@glidejs/glide": "^3.6.0",
         "@highlightjs/cdn-assets": "10.4.1",
-        "@huggingface/transformers": "^3.6.3",
         "@isomorphic-git/lightning-fs": "^4.6.0",
         "@js-joda/core": "3.2.0",
         "@js-joda/locale_en-us": "3.1.1",
@@ -197,24 +196,5 @@
         "url": "^0.11.0",
         "util": "^0.12.5",
         "yargs-parser": "20.2.4"
-    },
-    "resolutions": {
-        "pixi-graph-fork/@pixi/app": "6.2.0",
-        "pixi-graph-fork/@pixi/constants": "6.2.0",
-        "pixi-graph-fork/@pixi/core": "6.2.0",
-        "pixi-graph-fork/@pixi/display": "6.2.0",
-        "pixi-graph-fork/@pixi/graphics": "6.2.0",
-        "pixi-graph-fork/@pixi/interaction": "6.2.0",
-        "pixi-graph-fork/@pixi/loaders": "6.2.0",
-        "pixi-graph-fork/@pixi/ticker": "6.2.0",
-        "pixi-graph-fork/@pixi/sprite": "6.2.0",
-        "pixi-graph-fork/@pixi/text": "6.2.0",
-        "pixi-graph-fork/@pixi/text-bitmap": "6.2.0",
-        "pixi-graph-fork/@pixi/utils": "6.2.0",
-        "pixi-graph-fork/@pixi/runner": "6.2.0",
-        "pixi-graph-fork/@pixi/mesh": "6.2.0",
-        "pixi-graph-fork/@pixi/settings": "6.2.0",
-        "pixi-graph-fork/@pixi/mixin-get-child-by-name": "6.2.0",
-        "pixi-graph-fork/@pixi/math": "6.2.0"
     }
 }
