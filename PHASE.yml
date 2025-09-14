@@ -1,9 +1,17 @@
-phase: "02_INVENTORY"
+phase: "03_FILE_CORE_READONLY"
 allowed_paths:
-  - tools/inventory.md
+  - PHASE.yml
+  - tools/check_phase.mjs
+  - .github/workflows/ci.yml
+  - packages/model/**
+  - packages/fs-adapter/**
+  - packages/file-core/**
+  - tools/fixtures/**
+  - pnpm-workspace.yaml
+  - tsconfig.base.json
 acceptance:
   - pnpm -w build
-  - pnpm -w lint
   - pnpm -w test
+  - pnpm -w lint
   - pnpm -w typecheck
 ts_strict_required: true

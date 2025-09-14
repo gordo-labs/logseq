@@ -1,0 +1,21 @@
+{
+  "name": "@logseq/file-core",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test dist/test/read.spec.js"
+  },
+  "dependencies": {
+    "@logseq/model": "workspace:*",
+    "@logseq/fs-adapter": "workspace:*"
+  }
+}
