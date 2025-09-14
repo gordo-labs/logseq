@@ -1,11 +1,12 @@
-phase: "03_FILE_CORE_READONLY"
+phase: "04_SIDECAR_INDEX"
 allowed_paths:
   - PHASE.yml
   - tools/check_phase.mjs
   - .github/workflows/ci.yml
+  - packages/sidecar-index/**
+  - packages/file-core/**
   - packages/model/**
   - packages/fs-adapter/**
-  - packages/file-core/**
   - tools/fixtures/**
   - pnpm-workspace.yaml
   - tsconfig.base.json
