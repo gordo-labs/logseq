@@ -4,10 +4,12 @@ allowed_paths:
   - tools/check_phase.mjs
   - .github/workflows/ci.yml
   - packages/sidecar-index/**
-  - packages/file-core/src/indexer.ts
-  - packages/file-core/test/indexer.spec.ts
+  - packages/file-core/**
+  - packages/model/**
+  - packages/fs-adapter/**
   - tools/fixtures/**
   - pnpm-workspace.yaml
+  - tsconfig.base.json
 acceptance:
   - pnpm -w build
   - pnpm -w test
