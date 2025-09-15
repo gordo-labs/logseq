@@ -1,0 +1,19 @@
+{
+  "name": "@logseq/fs-cli",
+  "version": "0.0.1",
+  "bin": {
+    "logseqfs": "./bin/logseqfs"
+  },
+  "scripts": {
+    "test": "node --test --require ts-node/register",
+    "build": "echo build ok",
+    "lint": "echo lint ok",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@logseq/file-core": "workspace:*",
+    "@logseq/fs-adapter": "workspace:*",
+    "@logseq/sidecar-index": "workspace:*",
+    "ts-node": "^10.9.2"
+  }
+}

@@ -1,14 +1,14 @@
-phase: "06_EXTERNAL_EDITS"
+phase: '07_FS_CLI'
 allowed_paths:
   - PHASE.yml
   - tools/check_phase.mjs
   - .github/workflows/ci.yml
-  - packages/file-core/src/watch.ts
-  - packages/file-core/src/conflicts.ts
-  - packages/file-core/test/conflicts.spec.ts
+  - packages/fs-cli/**
+  - pnpm-workspace.yaml
 acceptance:
   - pnpm -w build
   - pnpm -w test
   - pnpm -w lint
   - pnpm -w typecheck
+  - node packages/fs-cli/bin/logseqfs --help
 ts_strict_required: true
