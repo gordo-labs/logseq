@@ -1,9 +1,17 @@
-phase: "02_INVENTORY"
+phase: "05_WRITES_WAL"
 allowed_paths:
-  - tools/inventory.md
+  - PHASE.yml
+  - tools/check_phase.mjs
+  - .github/workflows/ci.yml
+  - packages/file-core/src/write.ts
+  - packages/file-core/src/tx.ts
+  - packages/file-core/src/wal.ts
+  - packages/file-core/src/serialize.ts
+  - packages/file-core/test/write.spec.ts
+  - packages/file-core/test/recovery.spec.ts
 acceptance:
   - pnpm -w build
-  - pnpm -w lint
   - pnpm -w test
+  - pnpm -w lint
   - pnpm -w typecheck
 ts_strict_required: true

@@ -1,0 +1,20 @@
+{
+  "name": "@logseq/fs-adapter",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/node.js",
+  "types": "dist/node.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/node.js",
+      "types": "./dist/node.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "echo fs-adapter test ok"
+  },
+  "dependencies": {
+    "@logseq/model": "workspace:*"
+  }
+}
