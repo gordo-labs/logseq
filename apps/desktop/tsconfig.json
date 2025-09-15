@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "moduleResolution": "Node",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@logseq/file-core": ["src/types/logseq-file-core"],
+      "@logseq/model": ["src/types/logseq-model"],
+      "@logseq/fs-adapter": ["src/types/logseq-fs-adapter"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
+  "exclude": ["dist"]
+}
