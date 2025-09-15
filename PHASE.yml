@@ -1,22 +1,13 @@
-phase: "01_FORK_PREP"
+phase: "04_SIDECAR_INDEX"
 allowed_paths:
-  - package.json
+  - packages/sidecar-index/**
+  - packages/file-core/src/indexer.ts
+  - packages/file-core/test/indexer.spec.ts
+  - tools/fixtures/**
   - pnpm-workspace.yaml
-  - tsconfig.base.json
-  - .eslintrc.cjs
-  - .prettierrc
-  - .github/workflows/**
-  - apps/legacy/**
-  - apps/**/.gitkeep
-  - packages/**/.gitkeep
-  - tools/**
 acceptance:
-  - pnpm i
   - pnpm -w build
-  - pnpm -w lint
   - pnpm -w test
+  - pnpm -w lint
   - pnpm -w typecheck
-require_readonly_markers:
-  - apps/legacy/README.md
 ts_strict_required: true
-
