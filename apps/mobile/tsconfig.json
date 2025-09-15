@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "jsx": "react-jsx",
+    "types": ["react-native"],
+    "baseUrl": "./src",
+    "paths": {
+      "@logseq/fs-adapter/rn": ["../../packages/fs-adapter/src/rn.ts"],
+      "@logseq/file-core": ["../../packages/file-core/src/index.ts"],
+      "@logseq/model": ["../../packages/model/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
