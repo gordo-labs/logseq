@@ -1,6 +1,7 @@
-phase: "08_DESKTOP_APP"
+phase: "09_MOBILE_APP"
 allowed_paths:
-  - apps/desktop/**
+  - apps/mobile/**
+  - packages/fs-adapter/src/rn.ts
   - pnpm-workspace.yaml
 acceptance:
   - pnpm -w build
