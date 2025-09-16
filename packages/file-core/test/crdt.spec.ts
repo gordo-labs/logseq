@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -25,6 +26,9 @@ test('merges multi-writer updates and persists to disk', async () => {
   ]);
   applyDelta(aliceDoc, deltaBob);
 
+  aliceDoc.format = 'yjs';
+  aliceDoc.encodedState = new Uint8Array([1, 2, 3, 4]);
+
   await manager.persist(aliceDoc);
 
   const markdown = await readFile(path.join(root, pagePath), 'utf8');
@@ -34,9 +38,16 @@ test('merges multi-writer updates and persists to disk', async () => {
   const crdtRel = manager.getCrdtPath(pagePath);
   const crdtFile = path.join(root, crdtRel);
   const stored = JSON.parse(await readFile(crdtFile, 'utf8'));
-  assert.deepEqual(Object.keys(stored.blocks).sort(), ['alice-block', 'bob-block']);
+  assert.equal(stored.version, 1);
+  assert.equal(stored.format, 'yjs');
+  assert.ok(aliceDoc.encodedState);
+  assert.equal(stored.encodedState, Buffer.from(aliceDoc.encodedState!).toString('base64'));
+  assert.deepEqual(Object.keys(stored.doc.blocks).sort(), ['alice-block', 'bob-block']);
 
   const reloaded = await manager.load(pagePath);
   const serialized = docToMarkdown(reloaded);
+  assert.equal(reloaded.format, 'yjs');
+  assert.ok(reloaded.encodedState);
+  assert.deepEqual(Array.from(reloaded.encodedState!), Array.from(aliceDoc.encodedState!));
   assert.equal(serialized, markdown.trim());
 });

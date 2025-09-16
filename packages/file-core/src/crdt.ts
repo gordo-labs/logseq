@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { parseFile, type ParsedData } from './parse.js';
@@ -25,7 +26,11 @@ export interface CrdtDoc {
   children: Map<string, string[]>;
   clock: Record<string, number>;
   tombstones: Map<string, LamportTimestamp>;
+  format: CrdtStorageFormat;
+  encodedState?: Uint8Array;
 }
+
+export type CrdtStorageFormat = 'lww-tree' | 'yjs' | 'automerge';
 
 export interface BlockContent {
   id: string;
@@ -75,6 +80,15 @@ interface SerializedDoc {
   children: Record<string, string[]>;
   tombstones: Record<string, LamportTimestamp>;
 }
+
+interface StoredCrdtEnvelopeV1 {
+  version: 1;
+  format: CrdtStorageFormat;
+  doc: SerializedDoc;
+  encodedState?: string;
+}
+
+type StoredCrdtFile = SerializedDoc | StoredCrdtEnvelopeV1;
 
 const ROOT_PREFIX = 'page:';
 const BLOCK_PREFIX = 'block:';
@@ -232,7 +246,9 @@ function createDocFromParsed(pagePath: string, parsed: ParsedData): CrdtDoc {
     blocks: new Map(),
     children: new Map(),
     clock: {},
-    tombstones: new Map()
+    tombstones: new Map(),
+    format: 'lww-tree',
+    encodedState: undefined
   };
   ensureChildren(doc, parentKey(doc.pageId, null));
   for (const block of parsed.blocks) {
@@ -278,7 +294,11 @@ function serializeDoc(doc: CrdtDoc): SerializedDoc {
   };
 }
 
-function deserializeDoc(data: SerializedDoc): CrdtDoc {
+function deserializeDoc(
+  data: SerializedDoc,
+  format: CrdtStorageFormat = 'lww-tree',
+  encodedState?: Uint8Array
+): CrdtDoc {
   const blocksEntries = Object.entries(data.blocks).map(([id, block]) => [id, { ...block } as BlockState]);
   const childrenEntries = Object.entries(data.children).map(([key, list]) => [key, [...list]] as const);
   const tombstoneEntries = Object.entries(data.tombstones).map(([id, ts]) => [id, ts] as const);
@@ -289,8 +309,37 @@ function deserializeDoc(data: SerializedDoc): CrdtDoc {
     clock: { ...data.clock },
     blocks: new Map(blocksEntries),
     children: new Map(childrenEntries),
-    tombstones: new Map(tombstoneEntries)
+    tombstones: new Map(tombstoneEntries),
+    format,
+    encodedState: encodedState ? encodedState.slice() : undefined
   };
+}
+
+function isStoredEnvelope(data: StoredCrdtFile): data is StoredCrdtEnvelopeV1 {
+  if (!data || typeof data !== 'object') return false;
+  const candidate = data as { version?: unknown; doc?: unknown; format?: unknown };
+  return candidate.version === 1 && candidate.doc !== undefined && candidate.format !== undefined;
+}
+
+function decodeStoredFile(data: StoredCrdtFile): CrdtDoc {
+  if (isStoredEnvelope(data)) {
+    const encoded = typeof data.encodedState === 'string' ? Buffer.from(data.encodedState, 'base64') : undefined;
+    const binary = encoded ? new Uint8Array(encoded) : undefined;
+    return deserializeDoc(data.doc, data.format, binary);
+  }
+  return deserializeDoc(data);
+}
+
+function createStoredEnvelope(doc: CrdtDoc): StoredCrdtEnvelopeV1 {
+  const envelope: StoredCrdtEnvelopeV1 = {
+    version: 1,
+    format: doc.format,
+    doc: serializeDoc(doc)
+  };
+  if (doc.encodedState !== undefined) {
+    envelope.encodedState = Buffer.from(doc.encodedState).toString('base64');
+  }
+  return envelope;
 }
 
 export class CrdtManager {
@@ -307,8 +356,8 @@ export class CrdtManager {
     const crdtAbs = path.join(this.root, crdtRel);
     try {
       const raw = await fs.readFile(crdtAbs, 'utf8');
-      const data = JSON.parse(raw) as SerializedDoc;
-      return deserializeDoc(data);
+      const data = JSON.parse(raw) as StoredCrdtFile;
+      return decodeStoredFile(data);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code !== 'ENOENT') throw err;
@@ -321,7 +370,8 @@ export class CrdtManager {
 
   async persist(doc: CrdtDoc): Promise<void> {
     const markdown = docToMarkdown(doc);
-    const crdt = JSON.stringify(serializeDoc(doc), null, 2);
+    const crdtData = createStoredEnvelope(doc);
+    const crdt = JSON.stringify(crdtData, null, 2);
     const crdtRel = this.getCrdtPath(doc.path);
     await writeFiles(this.root, [
       { path: doc.path, content: markdown },
