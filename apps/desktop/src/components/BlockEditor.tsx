@@ -31,52 +31,230 @@ interface BlockEditorProps {
   onFocusHandled?: () => void;
 }
 
-// Parse and render page references [[Page Name]] and block references ((block-id))
-const renderTextWithLinks = (
+// Task markers supported by Logseq
+const TASK_MARKERS = ['TODO', 'DOING', 'DONE', 'NOW', 'LATER', 'WAITING', 'CANCELLED'] as const;
+type TaskMarker = typeof TASK_MARKERS[number];
+
+// Slash commands
+interface SlashCommand {
+  name: string;
+  label: string;
+  icon: string;
+  action: (text: string, cursorPos: number) => { text: string; cursorPos: number };
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    name: 'TODO',
+    label: 'TODO',
+    icon: '☐',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, 'TODO '), cursorPos: pos + 5 }),
+  },
+  {
+    name: 'DOING',
+    label: 'DOING',
+    icon: '⏳',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, 'DOING '), cursorPos: pos + 6 }),
+  },
+  {
+    name: 'DONE',
+    label: 'DONE',
+    icon: '✓',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, 'DONE '), cursorPos: pos + 5 }),
+  },
+  {
+    name: 'NOW',
+    label: 'NOW',
+    icon: '▶',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, 'NOW '), cursorPos: pos + 4 }),
+  },
+  {
+    name: 'LATER',
+    label: 'LATER',
+    icon: '📋',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, 'LATER '), cursorPos: pos + 6 }),
+  },
+  {
+    name: 'WAITING',
+    label: 'WAITING',
+    icon: '⏸',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, 'WAITING '), cursorPos: pos + 8 }),
+  },
+  {
+    name: 'date',
+    label: 'Current Date',
+    icon: '📅',
+    action: (text, pos) => {
+      const date = new Date();
+      const dateStr = `[[${date.toISOString().split('T')[0]}]]`;
+      return { text: insertAtCursor(text, pos, dateStr), cursorPos: pos + dateStr.length };
+    },
+  },
+  {
+    name: 'time',
+    label: 'Current Time',
+    icon: '🕐',
+    action: (text, pos) => {
+      const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      return { text: insertAtCursor(text, pos, time), cursorPos: pos + time.length };
+    },
+  },
+  {
+    name: 'pageref',
+    label: 'Page Reference',
+    icon: '📄',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, '[[]]'), cursorPos: pos + 2 }),
+  },
+  {
+    name: 'blockref',
+    label: 'Block Reference',
+    icon: '🔗',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, '(())'), cursorPos: pos + 2 }),
+  },
+  {
+    name: 'code',
+    label: 'Code Block',
+    icon: '💻',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, '```\n\n```'), cursorPos: pos + 4 }),
+  },
+  {
+    name: 'quote',
+    label: 'Quote',
+    icon: '❝',
+    action: (text, pos) => ({ text: insertAtCursor(text, pos, '> '), cursorPos: pos + 2 }),
+  },
+];
+
+function insertAtCursor(text: string, pos: number, insert: string): string {
+  return text.slice(0, pos) + insert + text.slice(pos);
+}
+
+// Extract marker from text
+function extractMarker(text: string): { marker: TaskMarker | null; restText: string } {
+  const trimmed = text.trimStart();
+  for (const marker of TASK_MARKERS) {
+    if (trimmed.startsWith(marker + ' ') || trimmed === marker) {
+      const restText = trimmed.slice(marker.length).trimStart();
+      return { marker, restText };
+    }
+  }
+  return { marker: null, restText: text };
+}
+
+// Cycle through markers: null -> TODO -> DOING -> DONE -> null
+function cycleMarker(current: TaskMarker | null): TaskMarker | null {
+  if (!current) return 'TODO';
+  if (current === 'TODO') return 'DOING';
+  if (current === 'DOING') return 'DONE';
+  if (current === 'DONE') return null;
+  if (current === 'NOW') return 'DONE';
+  if (current === 'LATER') return 'NOW';
+  if (current === 'WAITING') return 'DONE';
+  if (current === 'CANCELLED') return null;
+  return null;
+}
+
+// Parse and render text with links, tags, code, etc.
+const renderTextWithFormatting = (
   text: string,
-  onSelectPage?: (title: string) => void
+  onSelectPage?: (title: string) => void,
+  onToggleMarker?: () => void
 ): React.ReactNode[] => {
+  const { marker, restText } = extractMarker(text);
   const parts: React.ReactNode[] = [];
-  const combinedRe = /(\[\[[^\]]+\]\])|(\(\([^)]+\)\))/g;
-  let lastIndex = 0;
-  let match;
   let keyCounter = 0;
 
-  while ((match = combinedRe.exec(text)) !== null) {
+  // Add marker if present
+  if (marker) {
+    parts.push(
+      <span
+        key={`marker-${keyCounter++}`}
+        className={`logseq-marker logseq-marker-${marker}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleMarker?.();
+        }}
+        title={`Click to toggle (${marker})`}
+      >
+        <span className="logseq-checkbox" />
+        {marker}
+      </span>
+    );
+  }
+
+  // Combined regex for all patterns
+  const combinedRe = /(\[\[[^\]]+\]\])|(\(\([^)]+\)\))|(#[a-zA-Z][a-zA-Z0-9_-]*)|(`[^`]+`)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = combinedRe.exec(restText)) !== null) {
+    // Add text before match
     if (match.index > lastIndex) {
-      parts.push(<span key={`text-${keyCounter++}`}>{text.slice(lastIndex, match.index)}</span>);
+      parts.push(<span key={`text-${keyCounter++}`}>{restText.slice(lastIndex, match.index)}</span>);
     }
+
     if (match[1]) {
+      // Page reference [[Page Name]]
       const pageTitle = match[1].slice(2, -2);
       parts.push(
         <span
           key={`page-${keyCounter++}`}
           className="logseq-page-ref"
-          onClick={e => {
+          onClick={(e) => {
             e.stopPropagation();
             onSelectPage?.(pageTitle);
           }}
-          title={`Go to page: ${pageTitle}`}
+          title={`Go to: ${pageTitle}`}
         >
           {match[1]}
         </span>
       );
     } else if (match[2]) {
+      // Block reference ((block-id))
       const blockId = match[2].slice(2, -2);
       parts.push(
-        <span key={`block-${keyCounter++}`} className="logseq-block-ref" title={`Block reference: ${blockId}`}>
+        <span
+          key={`block-${keyCounter++}`}
+          className="logseq-block-ref"
+          title={`Block: ${blockId}`}
+        >
           {match[2]}
         </span>
+      );
+    } else if (match[3]) {
+      // Tag #tag
+      const tag = match[3].slice(1);
+      parts.push(
+        <span
+          key={`tag-${keyCounter++}`}
+          className="logseq-tag"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectPage?.(tag);
+          }}
+          title={`Tag: ${tag}`}
+        >
+          {match[3]}
+        </span>
+      );
+    } else if (match[4]) {
+      // Inline code `code`
+      const code = match[4].slice(1, -1);
+      parts.push(
+        <code key={`code-${keyCounter++}`} className="logseq-inline-code">
+          {code}
+        </code>
       );
     }
     lastIndex = match.index + match[0].length;
   }
 
-  if (lastIndex < text.length) {
-    parts.push(<span key={`text-${keyCounter++}`}>{text.slice(lastIndex)}</span>);
+  // Add remaining text
+  if (lastIndex < restText.length) {
+    parts.push(<span key={`text-${keyCounter++}`}>{restText.slice(lastIndex)}</span>);
   }
 
-  return parts.length > 0 ? parts : [<span key="text-0">{text}</span>];
+  return parts.length > 0 ? parts : [<span key="empty">{text}</span>];
 };
 
 const autoResize = (el: HTMLTextAreaElement) => {
@@ -110,13 +288,22 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
 }: BlockEditorProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashMenuIndex, setSlashMenuIndex] = useState(0);
+  const [slashFilter, setSlashFilter] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const slashPosRef = useRef<number>(0);
 
-  // Handle external focus trigger (e.g. after Enter creates a new block)
+  // Filter slash commands
+  const filteredCommands = SLASH_COMMANDS.filter(cmd =>
+    cmd.name.toLowerCase().includes(slashFilter.toLowerCase()) ||
+    cmd.label.toLowerCase().includes(slashFilter.toLowerCase())
+  );
+
+  // Handle external focus trigger
   useLayoutEffect(() => {
     if (focusTrigger == null) return;
     setIsEditing(true);
-    // Use setTimeout to ensure the textarea is rendered before focusing
     const id = setTimeout(() => {
       const el = textareaRef.current;
       if (!el) return;
@@ -156,15 +343,90 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       autoResize(e.target);
-      onTextChange(block.id, e.target.value);
+      const newText = e.target.value;
+      const cursorPos = e.target.selectionStart;
+      
+      // Check for slash command trigger
+      const textBeforeCursor = newText.slice(0, cursorPos);
+      const slashMatch = textBeforeCursor.match(/\/([a-zA-Z]*)$/);
+      
+      if (slashMatch) {
+        setSlashMenuOpen(true);
+        setSlashFilter(slashMatch[1]);
+        setSlashMenuIndex(0);
+        slashPosRef.current = cursorPos - slashMatch[0].length;
+      } else {
+        setSlashMenuOpen(false);
+        setSlashFilter('');
+      }
+      
+      onTextChange(block.id, newText);
     },
     [block.id, onTextChange]
   );
+
+  const handleSlashCommand = useCallback((cmd: SlashCommand) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    
+    // Remove the slash and filter text
+    const textWithoutSlash = block.text.slice(0, slashPosRef.current) + block.text.slice(el.selectionStart);
+    const result = cmd.action(textWithoutSlash, slashPosRef.current);
+    
+    onTextChange(block.id, result.text);
+    setSlashMenuOpen(false);
+    setSlashFilter('');
+    
+    // Set cursor position
+    setTimeout(() => {
+      if (el) {
+        el.focus();
+        el.setSelectionRange(result.cursorPos, result.cursorPos);
+      }
+    }, 0);
+  }, [block.id, block.text, onTextChange]);
+
+  const handleToggleMarker = useCallback(() => {
+    const { marker, restText } = extractMarker(block.text);
+    const newMarker = cycleMarker(marker);
+    const leadingWhitespace = block.text.match(/^\s*/)?.[0] || '';
+    const newText = newMarker 
+      ? `${leadingWhitespace}${newMarker} ${restText}`
+      : `${leadingWhitespace}${restText}`;
+    onTextChange(block.id, newText);
+  }, [block.id, block.text, onTextChange]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const isMac = navigator.platform.toLowerCase().includes('mac') || navigator.userAgent.includes('Mac');
       const metaKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Handle slash menu navigation
+      if (slashMenuOpen) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSlashMenuIndex(i => Math.min(i + 1, filteredCommands.length - 1));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSlashMenuIndex(i => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          if (filteredCommands[slashMenuIndex]) {
+            handleSlashCommand(filteredCommands[slashMenuIndex]);
+          }
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setSlashMenuOpen(false);
+          setSlashFilter('');
+          return;
+        }
+      }
 
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -185,6 +447,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
 
       if (e.key === 'Escape') {
         setIsEditing(false);
+        setSlashMenuOpen(false);
         textareaRef.current?.blur();
         return;
       }
@@ -194,10 +457,16 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
         if (!isFirstInFlat) {
           onMergeWithPrev();
         } else {
-          // First block — just remove if empty and no children
           onRemove();
         }
         setIsEditing(false);
+        return;
+      }
+
+      // Toggle TODO marker with Cmd/Ctrl + Enter
+      if (metaKey && e.key === 'Enter') {
+        e.preventDefault();
+        handleToggleMarker();
         return;
       }
 
@@ -219,6 +488,11 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       isFirst,
       isLast,
       isFirstInFlat,
+      slashMenuOpen,
+      filteredCommands,
+      slashMenuIndex,
+      handleSlashCommand,
+      handleToggleMarker,
       onAddSiblingAfter,
       onIndent,
       onOutdent,
@@ -235,10 +509,11 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
 
   const handleBlur = useCallback(() => {
     setIsEditing(false);
+    setSlashMenuOpen(false);
     onBlur?.();
   }, [onBlur]);
 
-  const renderedContent = renderTextWithLinks(block.text, onSelectPage);
+  const renderedContent = renderTextWithFormatting(block.text, onSelectPage, handleToggleMarker);
 
   // Bullet appearance: triangle for collapsible, dot otherwise
   const bulletContent = hasChildren ? (
@@ -253,7 +528,10 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
   return (
     <div
       className={`logseq-block ${depth > 0 ? 'logseq-block-child' : ''}`}
-      style={{ paddingLeft: `${depth * 24}px` }}
+      style={{ 
+        paddingLeft: `${depth * 22}px`,
+        '--depth': depth,
+      } as React.CSSProperties}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -266,25 +544,46 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
           {bulletContent}
         </div>
         {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            className="logseq-block-input"
-            value={block.text}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            placeholder="Type something…"
-            rows={1}
-            style={{ minHeight: '24px' }}
-          />
+          <div style={{ flex: 1, position: 'relative' }}>
+            <textarea
+              ref={textareaRef}
+              className="logseq-block-input"
+              value={block.text}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              placeholder="Type something… (/ for commands)"
+              rows={1}
+              style={{ minHeight: '24px' }}
+            />
+            {slashMenuOpen && filteredCommands.length > 0 && (
+              <div className="slash-command-menu">
+                {filteredCommands.map((cmd, idx) => (
+                  <div
+                    key={cmd.name}
+                    className={`slash-command-item ${idx === slashMenuIndex ? 'selected' : ''}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSlashCommand(cmd);
+                    }}
+                    onMouseEnter={() => setSlashMenuIndex(idx)}
+                  >
+                    <span className="slash-command-icon">{cmd.icon}</span>
+                    <span className="slash-command-label">{cmd.label}</span>
+                    <span className="slash-command-shortcut">/{cmd.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="logseq-block-text" onClick={handleContentClick}>
             {block.text ? renderedContent : <span className="logseq-block-placeholder">Click to edit…</span>}
           </div>
         )}
       </div>
-      {isHovered && (
+      {isHovered && !isEditing && (
         <div className="logseq-block-menu">
           <button type="button" className="logseq-block-menu-item" onClick={onAddSiblingAfter} title="Add sibling (Enter)">
             +
@@ -305,27 +604,10 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
             type="button"
             className="logseq-block-menu-item"
             onClick={onOutdent}
+            disabled={depth === 0}
             title="Outdent (Shift+Tab)"
           >
             ⇤
-          </button>
-          <button
-            type="button"
-            className="logseq-block-menu-item"
-            onClick={onMoveUp}
-            disabled={isFirst}
-            title="Move up (⌘↑)"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="logseq-block-menu-item"
-            onClick={onMoveDown}
-            disabled={isLast}
-            title="Move down (⌘↓)"
-          >
-            ↓
           </button>
           <button type="button" className="logseq-block-menu-item" onClick={onRemove} title="Delete">
             ×

@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import type { Page } from '@logseq/model';
 import { SearchPanel } from './SearchPanel';
-import { getTodayJournalTitle } from '../lib/dates';
+import { formatJournalTitle, getTodayJournalTitle, isJournalTitle, getRelativeDay } from '../lib/dates';
 
 interface LeftSidebarProps {
   pages: Page[];
@@ -14,6 +14,27 @@ interface LeftSidebarProps {
 
 const PAGE_SIZE = 50;
 
+// Theme hook
+function useTheme() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    const stored = localStorage.getItem('logseq-theme');
+    return (stored === 'light' ? 'light' : 'dark');
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.remove('theme-light', 'theme-dark');
+    document.documentElement.classList.add(`theme-${theme}`);
+    localStorage.setItem('logseq-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  }, []);
+
+  return { theme, toggleTheme };
+}
+
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   pages,
   selectedPage,
@@ -22,19 +43,22 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   todayTitle,
   graphRoot
 }: LeftSidebarProps) => {
-  const [activeTab, setActiveTab] = useState<'today' | 'all' | 'recent' | 'favorites'>('today');
+  const { theme, toggleTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState<'journals' | 'all' | 'recent' | 'favorites'>('journals');
   const [pageIndex, setPageIndex] = useState(0);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
     const stored = localStorage.getItem('logseq-favorites');
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
   const [recentPages, setRecentPages] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
     const stored = localStorage.getItem('logseq-recent');
     return stored ? JSON.parse(stored) : [];
   });
 
   // Update recent pages when a page is selected
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedPage) {
       setRecentPages(prev => {
         const updated = [selectedPage, ...prev.filter(p => p !== selectedPage)].slice(0, 20);
@@ -57,12 +81,28 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     });
   };
 
+  // Separate journal pages from regular pages
+  const { journalPages, regularPages } = useMemo(() => {
+    const journals: Page[] = [];
+    const regular: Page[] = [];
+    for (const page of pages) {
+      if (isJournalTitle(page.title)) {
+        journals.push(page);
+      } else {
+        regular.push(page);
+      }
+    }
+    // Sort journals by date (newest first)
+    journals.sort((a, b) => b.title.localeCompare(a.title));
+    return { journalPages: journals, regularPages: regular };
+  }, [pages]);
+
   const paginatedPages = useMemo(() => {
     const start = pageIndex * PAGE_SIZE;
-    return pages.slice(start, start + PAGE_SIZE);
-  }, [pages, pageIndex]);
+    return regularPages.slice(start, start + PAGE_SIZE);
+  }, [regularPages, pageIndex]);
 
-  const totalPages = Math.max(1, Math.ceil(pages.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(regularPages.length / PAGE_SIZE));
 
   const favoritePages = useMemo(() => {
     return pages.filter(p => favorites.has(p.title));
@@ -74,52 +114,62 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       .filter((p): p is Page => p !== undefined);
   }, [recentPages, pages]);
 
-  const renderPageList = (pageList: Page[]) => (
+  const renderPageList = (pageList: Page[], showFavorite = true) => (
     <ul className="logseq-page-list">
       {pageList.length === 0 ? (
-        <li className="logseq-empty-state">No pages</li>
+        <li className="logseq-empty-state" style={{ padding: '12px', fontSize: '12px' }}>No pages</li>
       ) : (
-        pageList.map((page: Page) => (
-          <li key={page.id} className="logseq-page-item">
-            <button
-              type="button"
-              className={`logseq-page-button ${page.title === selectedPage ? 'active' : ''}`}
-              onClick={() => onSelectPage(page.title)}
-              title={page.title}
-            >
-              <span className="logseq-page-title">{page.title}</span>
-            </button>
-            <button
-              type="button"
-              className={`logseq-favorite-button ${favorites.has(page.title) ? 'active' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(page.title);
-              }}
-              title={favorites.has(page.title) ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              {favorites.has(page.title) ? '★' : '☆'}
-            </button>
-          </li>
-        ))
+        pageList.map((page: Page) => {
+          const relDay = isJournalTitle(page.title) ? getRelativeDay(page.title) : null;
+          return (
+            <li key={page.id} className="logseq-page-item">
+              <button
+                type="button"
+                className={`logseq-page-button ${page.title === selectedPage ? 'active' : ''}`}
+                onClick={() => onSelectPage(page.title)}
+                title={page.title}
+              >
+                <span className="logseq-page-title">
+                  {page.title}
+                  {relDay && <span style={{ marginLeft: '6px', opacity: 0.5, fontSize: '11px' }}>({relDay})</span>}
+                </span>
+              </button>
+              {showFavorite && (
+                <button
+                  type="button"
+                  className={`logseq-favorite-button ${favorites.has(page.title) ? 'active' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(page.title);
+                  }}
+                  title={favorites.has(page.title) ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  {favorites.has(page.title) ? '★' : '☆'}
+                </button>
+              )}
+            </li>
+          );
+        })
       )}
     </ul>
   );
+
+  const graphName = graphRoot ? graphRoot.split('/').pop() || graphRoot : null;
 
   return (
     <aside className="logseq-left-sidebar">
       <div className="logseq-sidebar-header">
         <div className="logseq-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
             <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>Logseq</span>
         </div>
-        {graphRoot && (
-          <div className="logseq-graph-name" title={graphRoot}>
-            {graphRoot.split('/').pop() || graphRoot}
+        {graphName && (
+          <div className="logseq-graph-name" title={graphRoot || undefined}>
+            📁 {graphName}
           </div>
         )}
       </div>
@@ -131,17 +181,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       <div className="logseq-sidebar-tabs">
         <button
           type="button"
-          className={`logseq-tab ${activeTab === 'today' ? 'active' : ''}`}
-          onClick={() => setActiveTab('today')}
+          className={`logseq-tab ${activeTab === 'journals' ? 'active' : ''}`}
+          onClick={() => setActiveTab('journals')}
         >
-          📅 Today
+          📅 Journals
         </button>
         <button
           type="button"
           className={`logseq-tab ${activeTab === 'all' ? 'active' : ''}`}
           onClick={() => setActiveTab('all')}
         >
-          📄 All Pages
+          📄 Pages
         </button>
         <button
           type="button"
@@ -160,8 +210,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       </div>
 
       <div className="logseq-sidebar-content">
-        {activeTab === 'today' && (
+        {activeTab === 'journals' && (
           <div className="logseq-tab-content">
+            {/* Today button */}
             <button
               type="button"
               className="logseq-today-button"
@@ -173,13 +224,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 <div className="logseq-today-date">{todayTitle}</div>
               </div>
             </button>
+            
+            {/* Recent journals */}
+            <div className="logseq-section-header">
+              <span>Recent Journals</span>
+            </div>
+            {renderPageList(journalPages.slice(0, 15), false)}
           </div>
         )}
 
         {activeTab === 'all' && (
           <div className="logseq-tab-content">
             <div className="logseq-section-header">
-              <span>All Pages ({pages.length})</span>
+              <span>All Pages ({regularPages.length})</span>
               {totalPages > 1 && (
                 <div className="logseq-pagination">
                   <button
@@ -224,6 +281,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       </div>
 
       <div className="logseq-sidebar-footer">
+        <button 
+          type="button" 
+          className="logseq-theme-button" 
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
         <button type="button" className="logseq-settings-button" onClick={onOpenSettings}>
           ⚙️ Settings
         </button>

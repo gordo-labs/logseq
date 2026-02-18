@@ -13,6 +13,7 @@ const GraphShell: React.FC = () => {
   const [selectedPage, setSelectedPage] = useState<string>(todayTitle);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [backlinksOpen, setBacklinksOpen] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -23,7 +24,6 @@ const GraphShell: React.FC = () => {
 
   const handleSelectPage = useCallback((title: string) => {
     setSelectedPage(title);
-    setBacklinksOpen(false);
     // Add to history
     setHistory(prev => {
       const newHistory = prev.slice(0, historyIndex + 1);
@@ -44,9 +44,48 @@ const GraphShell: React.FC = () => {
     return () => window.removeEventListener('logseq:select-page', handlePageSelect as EventListener);
   }, [handleSelectPage]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toLowerCase().includes('mac') || navigator.userAgent.includes('Mac');
+      const metaKey = isMac ? e.metaKey : e.ctrlKey;
+      
+      // Toggle left sidebar
+      if (metaKey && e.key === '/') {
+        e.preventDefault();
+        setLeftSidebarOpen(prev => !prev);
+      }
+      // Toggle right sidebar (backlinks)
+      if (metaKey && e.key === '\\') {
+        e.preventDefault();
+        setBacklinksOpen(prev => !prev);
+      }
+      // Navigate back
+      if (metaKey && e.key === '[') {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setSelectedPage(history[newIndex]);
+        }
+      }
+      // Navigate forward
+      if (metaKey && e.key === ']') {
+        e.preventDefault();
+        if (historyIndex < history.length - 1) {
+          const newIndex = historyIndex + 1;
+          setHistoryIndex(newIndex);
+          setSelectedPage(history[newIndex]);
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [historyIndex, history]);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    // Search logic can be handled by SearchPanel
   };
 
   const handleGoBack = () => {
@@ -65,22 +104,34 @@ const GraphShell: React.FC = () => {
     }
   };
 
+  const handleToggleSidebar = () => {
+    setLeftSidebarOpen(prev => !prev);
+  };
+
+  const handleToggleRightSidebar = () => {
+    setBacklinksOpen(prev => !prev);
+  };
+
   return (
     <div className="logseq-app" style={{ minHeight: '100vh', display: 'flex' }}>
-      <LeftSidebar
-        pages={pages}
-        selectedPage={selectedPage}
-        onSelectPage={handleSelectPage}
-        onOpenSettings={() => setSettingsOpen(true)}
-        todayTitle={todayTitle}
-        graphRoot={root}
-      />
+      {leftSidebarOpen && (
+        <LeftSidebar
+          pages={pages}
+          selectedPage={selectedPage}
+          onSelectPage={handleSelectPage}
+          onOpenSettings={() => setSettingsOpen(true)}
+          todayTitle={todayTitle}
+          graphRoot={root}
+        />
+      )}
       <div className="logseq-main-container">
         <Header
           pageTitle={selectedPage}
           onSearch={handleSearch}
           onGoBack={historyIndex > 0 ? handleGoBack : undefined}
           onGoForward={historyIndex < history.length - 1 ? handleGoForward : undefined}
+          onToggleSidebar={handleToggleSidebar}
+          onToggleRightSidebar={handleToggleRightSidebar}
         />
         <main className="logseq-main-content">
           {!root ? (

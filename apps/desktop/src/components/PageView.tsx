@@ -29,6 +29,7 @@ import type { BlockNode, FlattenedBlock } from '../lib/page';
 import { createTransaction } from '../types/transaction';
 import type { WriteFileOperation } from '../types/system';
 import { BlockEditor } from './BlockEditor';
+import { isJournalTitle, getPreviousDay, getNextDay, getRelativeDay } from '../lib/dates';
 
 interface PageViewProps {
   pageTitle: string;
@@ -62,7 +63,7 @@ interface RowData {
   onBlur: () => void;
 }
 
-const DEFAULT_ROW_HEIGHT = 36;
+const DEFAULT_ROW_HEIGHT = 32;
 
 /**
  * VirtualRow is defined OUTSIDE PageView so it has a stable identity.
@@ -162,6 +163,10 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
   const listRef = useRef<VariableSizeList<RowData>>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const itemHeights = useRef<number[]>([]);
+
+  // Journal page detection
+  const isJournal = useMemo(() => isJournalTitle(pageTitle), [pageTitle]);
+  const relativeDay = useMemo(() => getRelativeDay(pageTitle), [pageTitle]);
 
   // Keep nodesRef in sync
   useEffect(() => {
@@ -421,6 +426,16 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
     setPendingFocus(null);
   }, []);
 
+  const handlePrevDay = useCallback(() => {
+    const prevDay = getPreviousDay(pageTitle);
+    handleSelectPage(prevDay);
+  }, [pageTitle, handleSelectPage]);
+
+  const handleNextDay = useCallback(() => {
+    const nextDay = getNextDay(pageTitle);
+    handleSelectPage(nextDay);
+  }, [pageTitle, handleSelectPage]);
+
   // Stable itemData for react-window
   const rowData = useMemo<RowData>(
     () => ({
@@ -465,7 +480,14 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
   return (
     <section className="logseq-page-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <div className="logseq-page-header">
-        <h1 className="logseq-page-title">{pageTitle}</h1>
+        <div>
+          <h1 className="logseq-page-title">{pageTitle}</h1>
+          {relativeDay && (
+            <span style={{ fontSize: '13px', color: 'var(--ls-secondary-text-color)', marginTop: '4px', display: 'block' }}>
+              {relativeDay}
+            </span>
+          )}
+        </div>
         <div className="logseq-page-actions">
           {status && <span className="logseq-status">{status}</span>}
           {saving && <span className="logseq-status">Saving…</span>}
@@ -475,6 +497,18 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
           </button>
         </div>
       </div>
+
+      {/* Journal Navigation */}
+      {isJournal && (
+        <div className="logseq-journal-nav">
+          <button type="button" onClick={handlePrevDay}>
+            ← Previous Day
+          </button>
+          <button type="button" onClick={handleNextDay}>
+            Next Day →
+          </button>
+        </div>
+      )}
 
       <div
         className="logseq-page-content"
