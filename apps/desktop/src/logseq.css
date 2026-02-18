@@ -1,0 +1,1017 @@
+/* Logseq Color Scheme */
+:root {
+  /* Logseq Blue - Primary accent */
+  --ls-primary-theme-color: hsl(200, 97%, 37%);
+  --ls-primary-theme-color-darker: hsl(200, 97%, 30%);
+  --ls-primary-theme-color-lighter: hsl(200, 97%, 45%);
+  
+  /* Background colors */
+  --ls-primary-background-color: #ffffff;
+  --ls-secondary-background-color: #f5f6fb;
+  --ls-tertiary-background-color: #e8ebf0;
+  
+  /* Sidebar colors */
+  --ls-left-sidebar-background: #1e2329;
+  --ls-left-sidebar-color: #d4d4d4;
+  --ls-left-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --ls-left-sidebar-active: rgba(255, 255, 255, 0.12);
+  
+  /* Text colors */
+  --ls-primary-text-color: #1d1d1d;
+  --ls-secondary-text-color: #6b7280;
+  --ls-link-text-color: var(--ls-primary-theme-color);
+  --ls-link-text-hover-color: var(--ls-primary-theme-color-darker);
+  
+  /* Border colors */
+  --ls-border-color: rgba(0, 0, 0, 0.08);
+  --ls-border-hover-color: rgba(0, 0, 0, 0.12);
+  
+  /* Block colors */
+  --ls-block-bullet-color: #9ca3af;
+  --ls-block-bullet-hover-color: var(--ls-primary-theme-color);
+  --ls-block-reference-color: var(--ls-primary-theme-color);
+  --ls-block-reference-bg: rgba(30, 136, 229, 0.1);
+  
+  /* Status colors */
+  --ls-success-color: #10b981;
+  --ls-error-color: #ef4444;
+  --ls-warning-color: #f59e0b;
+  
+  /* Spacing */
+  --ls-block-spacing: 4px;
+  --ls-page-padding: 48px;
+  --ls-sidebar-width: 280px;
+  --ls-header-height: 48px;
+  
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  display: block;
+  visibility: visible;
+}
+
+/* Main App Layout */
+.logseq-app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+}
+
+.logseq-main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.logseq-main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--ls-primary-background-color);
+  padding: var(--ls-page-padding);
+  padding-top: calc(var(--ls-page-padding) + 16px);
+}
+
+/* Left Sidebar */
+.logseq-left-sidebar {
+  width: var(--ls-sidebar-width);
+  background: var(--ls-left-sidebar-background);
+  color: var(--ls-left-sidebar-color);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.logseq-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logseq-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ls-primary-theme-color);
+  margin-bottom: 8px;
+}
+
+.logseq-logo svg {
+  color: var(--ls-primary-theme-color);
+}
+
+.logseq-graph-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logseq-sidebar-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logseq-sidebar-tabs {
+  display: flex;
+  padding: 8px;
+  gap: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: auto;
+}
+
+.logseq-tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--ls-left-sidebar-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.logseq-tab:hover {
+  background: var(--ls-left-sidebar-hover);
+}
+
+.logseq-tab.active {
+  background: var(--ls-left-sidebar-active);
+  color: var(--ls-primary-theme-color);
+}
+
+.logseq-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.logseq-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.logseq-today-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--ls-left-sidebar-hover);
+  border: none;
+  border-radius: 8px;
+  color: var(--ls-left-sidebar-color);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.logseq-today-button:hover {
+  background: var(--ls-left-sidebar-active);
+}
+
+.logseq-today-icon {
+  font-size: 20px;
+}
+
+.logseq-today-label {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.logseq-today-date {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.logseq-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.logseq-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.logseq-pagination button {
+  padding: 2px 6px;
+  background: var(--ls-left-sidebar-hover);
+  border: none;
+  border-radius: 4px;
+  color: var(--ls-left-sidebar-color);
+  cursor: pointer;
+}
+
+.logseq-pagination button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.logseq-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logseq-page-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logseq-page-button {
+  flex: 1;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  color: var(--ls-left-sidebar-color);
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.logseq-page-button:hover {
+  background: var(--ls-left-sidebar-hover);
+}
+
+.logseq-page-button.active {
+  background: var(--ls-left-sidebar-active);
+  color: var(--ls-primary-theme-color);
+}
+
+.logseq-favorite-button {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.logseq-page-item:hover .logseq-favorite-button {
+  opacity: 1;
+}
+
+.logseq-favorite-button.active {
+  color: #fbbf24;
+  opacity: 1;
+}
+
+.logseq-empty-state {
+  padding: 8px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.logseq-sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logseq-settings-button {
+  width: 100%;
+  padding: 8px;
+  background: var(--ls-left-sidebar-hover);
+  border: none;
+  border-radius: 6px;
+  color: var(--ls-left-sidebar-color);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.logseq-settings-button:hover {
+  background: var(--ls-left-sidebar-active);
+}
+
+/* Header */
+.logseq-header {
+  height: var(--ls-header-height);
+  background: var(--ls-primary-background-color);
+  border-bottom: 1px solid var(--ls-border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logseq-header-left {
+  display: flex;
+  gap: 4px;
+}
+
+.logseq-header-button {
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--ls-secondary-text-color);
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.logseq-header-button:hover {
+  background: var(--ls-tertiary-background-color);
+  color: var(--ls-primary-text-color);
+}
+
+.logseq-header-center {
+  flex: 1;
+}
+
+.logseq-header-search {
+  max-width: 500px;
+}
+
+.logseq-header-search input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--ls-primary-text-color);
+  transition: all 0.2s;
+}
+
+.logseq-header-search input:focus {
+  outline: none;
+  border-color: var(--ls-primary-theme-color);
+  background: var(--ls-primary-background-color);
+  box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.1);
+}
+
+.logseq-header-right {
+  display: flex;
+  align-items: center;
+}
+
+.logseq-page-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ls-secondary-text-color);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Page View */
+.logseq-page-view {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.logseq-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ls-border-color);
+}
+
+.logseq-page-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ls-primary-text-color);
+  margin: 0;
+}
+
+.logseq-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logseq-status {
+  font-size: 13px;
+  color: var(--ls-success-color);
+}
+
+.logseq-error {
+  font-size: 13px;
+  color: var(--ls-error-color);
+}
+
+.logseq-button {
+  padding: 6px 12px;
+  background: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-border-color);
+  border-radius: 6px;
+  color: var(--ls-primary-text-color);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.logseq-button:hover {
+  background: var(--ls-border-hover-color);
+}
+
+.logseq-button-primary {
+  padding: 8px 16px;
+  background: var(--ls-primary-theme-color);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.logseq-button-primary:hover {
+  background: var(--ls-primary-theme-color-darker);
+}
+
+.logseq-page-content {
+  min-height: 400px;
+}
+
+.logseq-blocks-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ls-block-spacing);
+}
+
+/* Block Editor */
+.logseq-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  position: relative;
+  min-height: 28px;
+}
+
+.logseq-block-content {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.logseq-block-bullet {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-top: 2px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.logseq-block-bullet:hover {
+  background: var(--ls-tertiary-background-color);
+}
+
+.logseq-bullet-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ls-block-bullet-color);
+  transition: all 0.2s;
+}
+
+.logseq-block:hover .logseq-bullet-dot {
+  background: var(--ls-block-bullet-hover-color);
+  transform: scale(1.2);
+}
+
+/* Collapsible bullet triangle */
+.logseq-bullet-triangle {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  transition: transform 0.15s ease;
+}
+
+.logseq-bullet-triangle.expanded {
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent var(--ls-block-bullet-color);
+  transform: rotate(90deg);
+}
+
+.logseq-bullet-triangle.collapsed {
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent var(--ls-block-bullet-color);
+  transform: rotate(0deg);
+}
+
+.logseq-block-bullet.has-children {
+  cursor: pointer;
+}
+
+.logseq-block:hover .logseq-bullet-triangle {
+  border-color: transparent transparent transparent var(--ls-block-bullet-hover-color);
+}
+
+/* Placeholder text in empty blocks */
+.logseq-block-placeholder {
+  color: var(--ls-secondary-text-color);
+  opacity: 0.5;
+  font-style: italic;
+  pointer-events: none;
+}
+
+.logseq-block-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--ls-primary-text-color);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}
+
+.logseq-block-text {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  color: var(--ls-primary-text-color);
+  font-size: 16px;
+  line-height: 1.6;
+  cursor: text;
+  word-wrap: break-word;
+}
+
+.logseq-block-menu {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: var(--ls-primary-background-color);
+  padding: 2px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.logseq-block:hover .logseq-block-menu {
+  opacity: 1;
+}
+
+.logseq-block-menu-item {
+  padding: 4px 8px;
+  background: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-border-color);
+  border-radius: 4px;
+  color: var(--ls-primary-text-color);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.logseq-block-menu-item:hover:not(:disabled) {
+  background: var(--ls-border-hover-color);
+}
+
+.logseq-block-menu-item:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Page and Block References */
+.logseq-page-ref {
+  color: var(--ls-block-reference-color);
+  background: var(--ls-block-reference-bg);
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.logseq-page-ref:hover {
+  background: rgba(30, 136, 229, 0.2);
+  text-decoration: underline;
+}
+
+.logseq-block-ref {
+  color: var(--ls-block-reference-color);
+  background: var(--ls-block-reference-bg);
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.logseq-block-ref:hover {
+  background: rgba(30, 136, 229, 0.2);
+}
+
+.logseq-add-block-button {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--ls-tertiary-background-color);
+  border: 1px dashed var(--ls-border-color);
+  border-radius: 6px;
+  color: var(--ls-secondary-text-color);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.logseq-add-block-button:hover {
+  background: var(--ls-border-hover-color);
+  border-color: var(--ls-primary-theme-color);
+  color: var(--ls-primary-theme-color);
+}
+
+/* Search Panel */
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: var(--ls-left-sidebar-color);
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--ls-primary-theme-color);
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.search-results {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.search-section {
+  margin-bottom: 12px;
+}
+
+.search-section-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
+.search-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-item {
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--ls-left-sidebar-color);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.search-item:hover {
+  background: var(--ls-left-sidebar-hover);
+}
+
+.search-snippet {
+  display: block;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.search-status,
+.search-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 8px;
+  text-align: center;
+}
+
+/* Backlinks Panel */
+.backlinks-panel {
+  position: fixed;
+  right: 0;
+  top: var(--ls-header-height);
+  width: 320px;
+  height: calc(100vh - var(--ls-header-height));
+  background: var(--ls-primary-background-color);
+  border-left: 1px solid var(--ls-border-color);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+}
+
+.backlinks-panel header {
+  padding: 16px;
+  border-bottom: 1px solid var(--ls-border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.backlinks-panel h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.backlinks-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.backlinks-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backlinks-panel li {
+  margin: 0;
+}
+
+.backlinks-panel button {
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--ls-primary-text-color);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backlinks-panel button:hover {
+  background: var(--ls-tertiary-background-color);
+}
+
+.backlink-page {
+  font-weight: 500;
+  color: var(--ls-link-text-color);
+}
+
+.backlink-page:hover {
+  text-decoration: underline;
+}
+
+.backlink-block {
+  font-size: 11px;
+  color: var(--ls-secondary-text-color);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Settings Panel */
+.settings-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.settings-content {
+  background: var(--ls-primary-background-color);
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.settings-content header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ls-border-color);
+}
+
+.settings-content h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.settings-content section {
+  margin-bottom: 24px;
+}
+
+.settings-content h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-actions button {
+  padding: 8px 16px;
+  background: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-border-color);
+  border-radius: 6px;
+  color: var(--ls-primary-text-color);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.settings-actions button:hover {
+  background: var(--ls-border-hover-color);
+}
+
+.settings-path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ls-secondary-text-color);
+  background: var(--ls-tertiary-background-color);
+  padding: 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-list li {
+  background: var(--ls-tertiary-background-color);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-list strong {
+  font-size: 13px;
+  color: var(--ls-primary-text-color);
+}
+
+.history-list span {
+  font-size: 12px;
+  color: var(--ls-secondary-text-color);
+}
+
+/* Empty States */
+.logseq-empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--ls-secondary-text-color);
+}
+
+.logseq-empty-state p {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.logseq-indexing-indicator {
+  padding: 12px 16px;
+  background: var(--ls-tertiary-background-color);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ls-secondary-text-color);
+  margin-bottom: 16px;
+}
+
+.logseq-error-banner {
+  padding: 12px 16px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: var(--ls-error-color);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.logseq-left-sidebar ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.logseq-left-sidebar ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

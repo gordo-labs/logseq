@@ -1,4 +1,4 @@
-import path from 'node:path';
+import path from './browser-path.js';
 import { Block, Link, Page } from '@logseq/model';
 
 export interface ParsedData {

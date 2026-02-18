@@ -1,61 +1,220 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { VariableSizeList } from 'react-window';
+import type { ListChildComponentProps } from 'react-window';
 import type { Block, Page } from '@logseq/model';
-import { FixedSizeList, type ListChildComponentProps } from 'react-window';
 import { useGraph } from '../state/GraphProvider';
 import { createBlockId, createTransactionId } from '../lib/ids';
 import { joinPath, pageFileName, relativeToRoot } from '../lib/paths';
 import {
   cloneTree,
   flattenTree,
+  indentBlock,
   insertBlock,
   loadPageSnapshot,
   moveBlock,
+  outdentBlock,
   removeBlock,
   serializePage,
-  updateBlockText
+  toggleCollapsed,
+  updateBlockText,
 } from '../lib/page';
 import type { BlockNode, FlattenedBlock } from '../lib/page';
 import { createTransaction } from '../types/transaction';
 import type { WriteFileOperation } from '../types/system';
+import { BlockEditor } from './BlockEditor';
 
 interface PageViewProps {
   pageTitle: string;
   onRequestBacklinks: () => void;
 }
 
-const ROW_HEIGHT = 68;
+interface PendingFocus {
+  blockId: string;
+  placement: 'start' | 'end';
+}
 
-export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklinks }: PageViewProps) => {
-  const { core, root, applyTransaction } = useGraph();
+/** Data passed via react-window itemData to each row renderer */
+interface RowData {
+  rows: FlattenedBlock[];
+  pendingFocus: PendingFocus | null;
+  onFocusHandled: () => void;
+  itemHeights: React.MutableRefObject<number[]>;
+  listRef: React.RefObject<VariableSizeList<RowData>>;
+  onTextChange: (id: string, text: string) => void;
+  onAddSiblingAfter: (row: FlattenedBlock) => void;
+  onAddChild: (row: FlattenedBlock) => void;
+  onIndent: (row: FlattenedBlock) => void;
+  onOutdent: (row: FlattenedBlock) => void;
+  onMoveUp: (row: FlattenedBlock) => void;
+  onMoveDown: (row: FlattenedBlock) => void;
+  onRemove: (row: FlattenedBlock) => void;
+  onToggleCollapsed: (row: FlattenedBlock) => void;
+  onMergeWithPrev: (row: FlattenedBlock) => void;
+  onSelectPage: (title: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+}
+
+const DEFAULT_ROW_HEIGHT = 36;
+
+/**
+ * VirtualRow is defined OUTSIDE PageView so it has a stable identity.
+ * react-window requires stable component references to avoid remounting items.
+ */
+const VirtualRow: React.FC<ListChildComponentProps<RowData>> = ({ index, style, data }) => {
+  const {
+    rows,
+    pendingFocus,
+    onFocusHandled,
+    itemHeights,
+    listRef,
+    onTextChange,
+    onAddSiblingAfter,
+    onAddChild,
+    onIndent,
+    onOutdent,
+    onMoveUp,
+    onMoveDown,
+    onRemove,
+    onToggleCollapsed,
+    onMergeWithPrev,
+    onSelectPage,
+    onFocus,
+    onBlur,
+  } = data;
+
+  const row = rows[index];
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  // Measure actual height and notify the list when it changes
+  useLayoutEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.offsetHeight;
+      if (h > 0 && itemHeights.current[index] !== h) {
+        itemHeights.current[index] = h;
+        listRef.current?.resetAfterIndex(index, false);
+      }
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, [index, itemHeights, listRef]);
+
+  if (!row) return null;
+
+  const isFocused = pendingFocus?.blockId === row.node.block.id;
+
+  return (
+    <div style={style}>
+      <div ref={innerRef}>
+        <BlockEditor
+          block={row.node.block}
+          depth={row.depth}
+          hasChildren={row.node.children.length > 0}
+          collapsed={row.node.collapsed ?? false}
+          isFirst={row.index === 0}
+          isLast={row.index === row.siblingCount - 1}
+          isFirstInFlat={index === 0}
+          onTextChange={onTextChange}
+          onToggleCollapsed={() => onToggleCollapsed(row)}
+          onAddSiblingAfter={() => onAddSiblingAfter(row)}
+          onAddChild={() => onAddChild(row)}
+          onIndent={() => onIndent(row)}
+          onOutdent={() => onOutdent(row)}
+          onMoveUp={() => onMoveUp(row)}
+          onMoveDown={() => onMoveDown(row)}
+          onRemove={() => onRemove(row)}
+          onMergeWithPrev={() => onMergeWithPrev(row)}
+          onSelectPage={onSelectPage}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          focusTrigger={isFocused ? pendingFocus!.placement : null}
+          onFocusHandled={onFocusHandled}
+        />
+      </div>
+    </div>
+  );
+};
+
+export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklinks }) => {
+  const { core, root, applyTransaction, loadPage } = useGraph();
   const [page, setPage] = useState<Page | null>(null);
   const [nodes, setNodes] = useState<BlockNode[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingFocus, setPendingFocus] = useState<PendingFocus | null>(null);
+  const [listHeight, setListHeight] = useState(500);
+
   const editSnapshotRef = useRef<BlockNode[] | null>(null);
   const nodesRef = useRef<BlockNode[]>([]);
+  const listRef = useRef<VariableSizeList<RowData>>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const itemHeights = useRef<number[]>([]);
 
+  // Keep nodesRef in sync
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
 
+  // Load page data when pageTitle or core changes
   useEffect(() => {
     if (!core) {
       setPage(null);
       setNodes([]);
       return;
     }
-    const snapshot = loadPageSnapshot(core, pageTitle);
-    setPage(snapshot.page);
-    setNodes(snapshot.nodes);
-    setStatus(null);
-    setError(null);
-  }, [core, pageTitle]);
+    const loadPageData = async () => {
+      setLoadingPage(true);
+      try {
+        await loadPage(pageTitle);
+        const snapshot = loadPageSnapshot(core, pageTitle);
+        setPage(snapshot.page);
+        setNodes(snapshot.nodes);
+        // Reset virtual list state
+        itemHeights.current = [];
+        listRef.current?.resetAfterIndex(0, true);
+        setStatus(null);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoadingPage(false);
+      }
+    };
+    void loadPageData();
+  }, [core, pageTitle, loadPage]);
+
+  // Measure container height for the virtual list
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () => setListHeight(el.clientHeight || 500);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Invalidate height cache when page changes
+  useEffect(() => {
+    itemHeights.current = [];
+    listRef.current?.resetAfterIndex(0, true);
+  }, [pageTitle]);
 
   const relativePath = useMemo(() => {
-    if (page?.path && root) {
-      return relativeToRoot(page.path, root);
-    }
+    if (page?.path && root) return relativeToRoot(page.path, root);
     return pageFileName(pageTitle);
   }, [page, root, pageTitle]);
 
@@ -75,10 +234,7 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
         return;
       }
       const operations: WriteFileOperation[] = [
-        {
-          path: relativePath,
-          content: serializePage(pageTitle, nextNodes)
-        }
+        { path: relativePath, content: serializePage(pageTitle, nextNodes) },
       ];
       const tx = createTransaction(createTransactionId(), operations);
       setSaving(true);
@@ -96,11 +252,13 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
     [applyTransaction, pageTitle, relativePath, root]
   );
 
+  // Flattened rows (respects collapsed state)
   const rows = useMemo<FlattenedBlock[]>(() => flattenTree(nodes), [nodes]);
-  const listHeight = useMemo(() => {
-    const total = Math.max(rows.length, 1) * ROW_HEIGHT;
-    return Math.min(total, 600);
-  }, [rows]);
+
+  const getItemSize = useCallback(
+    (index: number) => itemHeights.current[index] ?? DEFAULT_ROW_HEIGHT,
+    []
+  );
 
   const createBlock = useCallback(
     (parentId: string | null, text = ''): Block => ({
@@ -108,26 +266,32 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
       pageId: pageTitle,
       parentId,
       text,
-      links: []
+      links: [],
     }),
     [pageTitle]
   );
 
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
   const handleAddRootBlock = useCallback(() => {
     const previous = cloneTree(nodesRef.current);
-    const next = insertBlock(previous, null, previous.length, createBlock(null, ''));
+    const newBlock = createBlock(null, '');
+    const next = insertBlock(previous, null, previous.length, newBlock);
     ensurePage();
     setNodes(next);
+    setPendingFocus({ blockId: newBlock.id, placement: 'end' });
     void persist(next, previous);
   }, [createBlock, ensurePage, persist]);
 
-  const handleAddAfter = useCallback(
+  const handleAddSiblingAfter = useCallback(
     (row: FlattenedBlock) => {
       const previous = cloneTree(nodesRef.current);
       const parentId = row.parent ? row.parent.block.id : null;
-      const next = insertBlock(previous, parentId, row.index + 1, createBlock(parentId, ''));
+      const newBlock = createBlock(parentId, '');
+      const next = insertBlock(previous, parentId, row.index + 1, newBlock);
       ensurePage();
       setNodes(next);
+      setPendingFocus({ blockId: newBlock.id, placement: 'end' });
       void persist(next, previous);
     },
     [createBlock, ensurePage, persist]
@@ -138,22 +302,47 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
       const previous = cloneTree(nodesRef.current);
       const parentId = row.node.block.id;
       const childCount = row.node.children.length;
-      const next = insertBlock(previous, parentId, childCount, createBlock(parentId, ''));
+      const newBlock = createBlock(parentId, '');
+      const next = insertBlock(previous, parentId, childCount, newBlock);
       ensurePage();
       setNodes(next);
+      setPendingFocus({ blockId: newBlock.id, placement: 'end' });
       void persist(next, previous);
     },
     [createBlock, ensurePage, persist]
+  );
+
+  const handleIndent = useCallback(
+    (row: FlattenedBlock) => {
+      if (row.index === 0) return; // First sibling — can't indent
+      const previous = cloneTree(nodesRef.current);
+      const next = indentBlock(previous, row.node.block.id);
+      setNodes(next);
+      setPendingFocus({ blockId: row.node.block.id, placement: 'end' });
+      void persist(next, previous);
+    },
+    [persist]
+  );
+
+  const handleOutdent = useCallback(
+    (row: FlattenedBlock) => {
+      if (!row.parent) return; // Already at root level
+      const previous = cloneTree(nodesRef.current);
+      const next = outdentBlock(previous, row.node.block.id);
+      setNodes(next);
+      setPendingFocus({ blockId: row.node.block.id, placement: 'end' });
+      void persist(next, previous);
+    },
+    [persist]
   );
 
   const handleMove = useCallback(
     (row: FlattenedBlock, direction: 'up' | 'down') => {
       const previous = cloneTree(nodesRef.current);
       const next = moveBlock(previous, row.node.block.id, direction);
-      if (serializePage(pageTitle, previous) === serializePage(pageTitle, next)) {
-        return;
-      }
+      if (serializePage(pageTitle, previous) === serializePage(pageTitle, next)) return;
       setNodes(next);
+      setPendingFocus({ blockId: row.node.block.id, placement: 'end' });
       void persist(next, previous);
     },
     [pageTitle, persist]
@@ -163,13 +352,44 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
     (row: FlattenedBlock) => {
       const previous = cloneTree(nodesRef.current);
       const next = removeBlock(previous, row.node.block.id);
-      if (serializePage(pageTitle, previous) === serializePage(pageTitle, next)) {
-        return;
-      }
+      if (serializePage(pageTitle, previous) === serializePage(pageTitle, next)) return;
       setNodes(next);
+      // Focus previous block if available
+      const prevFlatIdx = row.flatIndex - 1;
+      const currentRows = flattenTree(previous);
+      if (prevFlatIdx >= 0 && currentRows[prevFlatIdx]) {
+        setPendingFocus({ blockId: currentRows[prevFlatIdx].node.block.id, placement: 'end' });
+      }
       void persist(next, previous);
     },
     [pageTitle, persist]
+  );
+
+  const handleToggleCollapsed = useCallback((row: FlattenedBlock) => {
+    const next = toggleCollapsed(nodesRef.current, row.node.block.id);
+    setNodes(next);
+    // No persist needed — collapsed state is not saved to disk
+  }, []);
+
+  const handleMergeWithPrev = useCallback(
+    (row: FlattenedBlock) => {
+      if (row.flatIndex === 0) return; // Nothing above to merge with
+      if (row.node.children.length > 0) return; // Don't merge block with children
+
+      const currentRows = flattenTree(nodesRef.current);
+      const prevRow = currentRows[row.flatIndex - 1];
+      if (!prevRow) return;
+
+      const previous = cloneTree(nodesRef.current);
+      // Append current text to previous (usually empty + empty = delete)
+      const combinedText = prevRow.node.block.text + row.node.block.text;
+      let next = updateBlockText(previous, prevRow.node.block.id, combinedText);
+      next = removeBlock(next, row.node.block.id);
+      setNodes(next);
+      setPendingFocus({ blockId: prevRow.node.block.id, placement: 'end' });
+      void persist(next, previous);
+    },
+    [persist]
   );
 
   const handleTextChange = useCallback((blockId: string, text: string) => {
@@ -193,78 +413,110 @@ export const PageView: React.FC<PageViewProps> = ({ pageTitle, onRequestBacklink
     void persist(nodesRef.current, snapshot);
   }, [ensurePage, pageTitle, persist]);
 
-  const renderRow = useCallback(
-    ({ index, style }: ListChildComponentProps<FlattenedBlock[]>) => {
-      const row = rows[index];
-      const block = row.node.block;
-      const depth = row.depth;
-      const siblings = row.parent ? row.parent.children : nodesRef.current;
-      const isFirst = row.index === 0;
-      const isLast = row.index === siblings.length - 1;
-      return (
-        <div className="block-row" style={style} data-depth={depth}>
-          <div className="block-editor" style={{ marginLeft: depth * 16 }}>
-            <textarea
-              value={block.text}
-              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => handleTextChange(block.id, event.target.value)}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-            />
-          </div>
-          <div className="block-controls">
-            <button type="button" onClick={() => handleAddAfter(row)}>+ Sibling</button>
-            <button type="button" onClick={() => handleAddChild(row)}>+ Child</button>
-            <button type="button" onClick={() => handleMove(row, 'up')} disabled={isFirst}>
-              ↑
-            </button>
-            <button type="button" onClick={() => handleMove(row, 'down')} disabled={isLast}>
-              ↓
-            </button>
-            <button type="button" onClick={() => handleRemove(row)}>✕</button>
-          </div>
-        </div>
-      );
-    },
-    [handleAddAfter, handleAddChild, handleBlur, handleMove, handleRemove, handleTextChange, handleFocus, rows]
+  const handleSelectPage = useCallback((title: string) => {
+    window.dispatchEvent(new CustomEvent('logseq:select-page', { detail: { pageTitle: title } }));
+  }, []);
+
+  const handleFocusHandled = useCallback(() => {
+    setPendingFocus(null);
+  }, []);
+
+  // Stable itemData for react-window
+  const rowData = useMemo<RowData>(
+    () => ({
+      rows,
+      pendingFocus,
+      onFocusHandled: handleFocusHandled,
+      itemHeights,
+      listRef,
+      onTextChange: handleTextChange,
+      onAddSiblingAfter: handleAddSiblingAfter,
+      onAddChild: handleAddChild,
+      onIndent: handleIndent,
+      onOutdent: handleOutdent,
+      onMoveUp: (row: FlattenedBlock) => handleMove(row, 'up'),
+      onMoveDown: (row: FlattenedBlock) => handleMove(row, 'down'),
+      onRemove: handleRemove,
+      onToggleCollapsed: handleToggleCollapsed,
+      onMergeWithPrev: handleMergeWithPrev,
+      onSelectPage: handleSelectPage,
+      onFocus: handleFocus,
+      onBlur: handleBlur,
+    }),
+    [
+      rows,
+      pendingFocus,
+      handleFocusHandled,
+      handleTextChange,
+      handleAddSiblingAfter,
+      handleAddChild,
+      handleIndent,
+      handleOutdent,
+      handleMove,
+      handleRemove,
+      handleToggleCollapsed,
+      handleMergeWithPrev,
+      handleSelectPage,
+      handleFocus,
+      handleBlur,
+    ]
   );
 
   return (
-    <section className="page-view">
-      <header className="page-header">
-        <div>
-          <h2>{pageTitle}</h2>
-          {status && <span className="status">{status}</span>}
-          {saving && <span className="status">Saving…</span>}
-          {error && <span className="error">{error}</span>}
-        </div>
-        <div className="page-header-actions">
-          <button type="button" onClick={handleAddRootBlock}>
-            Add Block
-          </button>
-          <button type="button" onClick={onRequestBacklinks}>
-            View Backlinks
+    <section className="logseq-page-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div className="logseq-page-header">
+        <h1 className="logseq-page-title">{pageTitle}</h1>
+        <div className="logseq-page-actions">
+          {status && <span className="logseq-status">{status}</span>}
+          {saving && <span className="logseq-status">Saving…</span>}
+          {error && <span className="logseq-error">{error}</span>}
+          <button type="button" className="logseq-button" onClick={onRequestBacklinks}>
+            🔗 Backlinks
           </button>
         </div>
-      </header>
-      {nodes.length === 0 ? (
-        <div className="empty-state">
-          <p>No blocks yet.</p>
-          <button type="button" onClick={handleAddRootBlock}>
-            Create first block
-          </button>
-        </div>
-      ) : (
-        <FixedSizeList
-          className="block-list"
-          height={listHeight}
-          itemCount={rows.length}
-          itemSize={ROW_HEIGHT}
-          width="100%"
-          itemData={rows}
-        >
-          {renderRow}
-        </FixedSizeList>
-      )}
+      </div>
+
+      <div
+        className="logseq-page-content"
+        ref={contentRef}
+        style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
+      >
+        {loadingPage ? (
+          <div className="logseq-empty-state">
+            <p>Loading page…</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="logseq-empty-state">
+            <p>No blocks yet. Click below to create your first block.</p>
+            <button type="button" className="logseq-button-primary" onClick={handleAddRootBlock}>
+              Create first block
+            </button>
+          </div>
+        ) : (
+          <>
+            <VariableSizeList<RowData>
+              ref={listRef}
+              height={listHeight}
+              itemCount={rows.length}
+              itemSize={getItemSize}
+              width="100%"
+              itemData={rowData}
+              overscanCount={8}
+              style={{ overflowX: 'hidden' }}
+            >
+              {VirtualRow}
+            </VariableSizeList>
+            <button
+              type="button"
+              className="logseq-add-block-button"
+              onClick={handleAddRootBlock}
+              title="Add new block (click or press Enter on last block)"
+            >
+              + Add block
+            </button>
+          </>
+        )}
+      </div>
     </section>
   );
 };

@@ -7,13 +7,16 @@ const blockLinkRe = /\(\(([^)]+)\)\)/g;
 export interface BlockNode {
   block: Block;
   children: BlockNode[];
+  collapsed?: boolean;
 }
 
 export interface FlattenedBlock {
   node: BlockNode;
   depth: number;
   parent: BlockNode | null;
-  index: number;
+  index: number;        // index within siblings
+  siblingCount: number; // total siblings in the same parent
+  flatIndex: number;    // position in the flat list
 }
 
 export interface PageSnapshot {
@@ -41,18 +44,24 @@ function buildNode(core: FileCore, block: Block): BlockNode {
   const children = childResult.ok
     ? childResult.value.map(child => buildNode(core, child))
     : [];
-  return {
-    block,
-    children
-  };
+  return { block, children };
 }
 
+/** Flatten the tree into a linear list, respecting collapsed state. */
 export function flattenTree(nodes: BlockNode[]): FlattenedBlock[] {
   const rows: FlattenedBlock[] = [];
+  let flatIdx = 0;
   const walk = (arr: BlockNode[], parent: BlockNode | null, depth: number) => {
     arr.forEach((node, idx) => {
-      rows.push({ node, depth, parent, index: idx });
-      if (node.children.length) {
+      rows.push({
+        node,
+        depth,
+        parent,
+        index: idx,
+        siblingCount: arr.length,
+        flatIndex: flatIdx++,
+      });
+      if (node.children.length && !node.collapsed) {
         walk(node.children, node, depth + 1);
       }
     });
@@ -116,6 +125,59 @@ export function moveBlock(nodes: BlockNode[], blockId: string, direction: 'up' |
   return cloned;
 }
 
+/** Toggle collapsed state of a block. */
+export function toggleCollapsed(nodes: BlockNode[], blockId: string): BlockNode[] {
+  const cloned = cloneTree(nodes);
+  const target = findNode(cloned, blockId);
+  if (target) {
+    target.collapsed = !target.collapsed;
+  }
+  return cloned;
+}
+
+/**
+ * Indent: make the block the last child of its previous sibling.
+ * Does nothing if the block is already first in its parent.
+ */
+export function indentBlock(nodes: BlockNode[], blockId: string): BlockNode[] {
+  const cloned = cloneTree(nodes);
+  const parentInfo = findParent(cloned, blockId, null);
+  if (!parentInfo) return cloned;
+  const { siblings } = parentInfo;
+  const currentIndex = siblings.findIndex(n => n.block.id === blockId);
+  if (currentIndex <= 0) return cloned; // First — can't indent
+  const [node] = siblings.splice(currentIndex, 1);
+  const prevSibling = siblings[currentIndex - 1];
+  // Uncollapse previous sibling so the moved block is visible
+  prevSibling.collapsed = false;
+  prevSibling.children.push(node);
+  node.block = { ...node.block, parentId: prevSibling.block.id };
+  return cloned;
+}
+
+/**
+ * Outdent: make the block a sibling of its parent (inserted right after the parent).
+ * Does nothing if the block is already at root level.
+ */
+export function outdentBlock(nodes: BlockNode[], blockId: string): BlockNode[] {
+  const cloned = cloneTree(nodes);
+  const parentInfo = findParent(cloned, blockId, null);
+  if (!parentInfo || !parentInfo.parent) return cloned; // Already root level
+
+  const { parent, siblings } = parentInfo;
+  const currentIndex = siblings.findIndex(n => n.block.id === blockId);
+  const [node] = siblings.splice(currentIndex, 1);
+
+  // Find parent's parent context
+  const grandParentInfo = findParent(cloned, parent.block.id, null);
+  const targetArray = grandParentInfo ? grandParentInfo.siblings : cloned;
+  const parentIndex = targetArray.findIndex(n => n.block.id === parent.block.id);
+  const newParentId = grandParentInfo?.parent?.block.id ?? null;
+  node.block = { ...node.block, parentId: newParentId };
+  targetArray.splice(parentIndex + 1, 0, node);
+  return cloned;
+}
+
 export function extractLinks(text: string): Link[] {
   const links: Link[] = [];
   let match: RegExpExecArray | null;
@@ -141,13 +203,13 @@ export function serializePage(title: string, nodes: BlockNode[]): string {
   return lines.join('\n') + '\n';
 }
 
+// ─── Private helpers ─────────────────────────────────────────────────────────
+
 function cloneNode(node: BlockNode): BlockNode {
   return {
-    block: {
-      ...node.block,
-      links: [...node.block.links]
-    },
-    children: node.children.map(cloneNode)
+    block: { ...node.block, links: [...node.block.links] },
+    children: node.children.map(cloneNode),
+    collapsed: node.collapsed,
   };
 }
 

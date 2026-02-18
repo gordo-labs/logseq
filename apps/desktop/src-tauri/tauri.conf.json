@@ -4,17 +4,18 @@
   "version": "0.0.0",
   "identifier": "com.logseq.desktop",
   "build": {
-    "beforeBuildCommand": "pnpm --dir .. build",
-    "beforeDevCommand": "pnpm --dir .. dev",
+    "beforeBuildCommand": "cd .. && pnpm build",
     "frontendDist": "../dist",
-    "devPath": "http://localhost:1420"
+    "devUrl": "http://localhost:1420"
   },
   "app": {
     "windows": [
       {
         "title": "Logseq",
         "width": 1280,
-        "height": 800
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
       }
     ]
   }

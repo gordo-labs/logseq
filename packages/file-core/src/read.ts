@@ -23,7 +23,7 @@ function notFound(msg: string): Result<never> {
 }
 
 export class InMemoryFileCore {
-  constructor(private idx: Indices) {}
+  constructor(protected idx: Indices) {}
 
   getPage(id: string): Result<Page> {
     const p = this.idx.pageByTitle.get(id);
@@ -73,4 +73,80 @@ export class InMemoryFileCore {
   }
 }
 
-export type FileCore = InMemoryFileCore;
+import type { FsAdapter } from '@logseq/fs-adapter';
+import { parseFile } from './parse.js';
+
+export class LazyFileCore extends InMemoryFileCore {
+  private loadedPages = new Set<string>();
+  private loadingPages = new Set<string>();
+
+  constructor(
+    idx: Indices,
+    private root: string,
+    private adapter: FsAdapter,
+    private fileMap: Map<string, string>,
+    private fileStats: Map<string, { mtimeMs: number }>
+  ) {
+    super(idx);
+  }
+
+  async loadPageOnDemand(title: string): Promise<void> {
+    if (this.loadedPages.has(title) || this.loadingPages.has(title)) {
+      return;
+    }
+
+    this.loadingPages.add(title);
+    try {
+      const page = this.idx.pageByTitle.get(title);
+      if (!page) return;
+
+      const file = page.path;
+      const content = await this.adapter.readFile(file);
+      const parsed = parseFile(file, content);
+      
+      const pageKey = `page:${title}`;
+      this.idx.childrenByParent.set(pageKey, []);
+      
+      const backlinkPairs: Array<{ key: string; value: Backlink }> = [];
+      
+      for (const block of parsed.blocks) {
+        this.idx.blocksById.set(block.id, block);
+        const parent = block.parentId ?? pageKey;
+        if (!this.idx.childrenByParent.has(parent)) {
+          this.idx.childrenByParent.set(parent, []);
+        }
+        this.idx.childrenByParent.get(parent)!.push(block.id);
+        for (const link of block.links) {
+          const key = link.type === 'page' ? `page:${link.page}` : `block:${link.blockId}`;
+          backlinkPairs.push({ key, value: { sourcePage: block.pageId, sourceBlockId: block.id } });
+        }
+      }
+
+      for (const { key, value } of backlinkPairs) {
+        if (!this.idx.backlinks.has(key)) this.idx.backlinks.set(key, []);
+        this.idx.backlinks.get(key)!.push(value);
+      }
+
+      this.loadedPages.add(title);
+    } finally {
+      this.loadingPages.delete(title);
+    }
+  }
+
+  override listBlocksByPage(pageId: string): Result<Block[]> {
+    if (!this.loadedPages.has(pageId)) {
+      return ok([]);
+    }
+    return super.listBlocksByPage(pageId);
+  }
+
+  override getBlock(id: string): Result<Block> {
+    const block = this.idx.blocksById.get(id);
+    if (block) {
+      return ok(block);
+    }
+    return notFound(`block ${id} not found`);
+  }
+}
+
+export type FileCore = InMemoryFileCore | LazyFileCore;

@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import path from './browser-path.js';
 import { appendWal, clearWal, WalEntry } from './wal.js';
 
 export interface WriteFileOperation {

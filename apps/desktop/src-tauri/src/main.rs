@@ -1,6 +1,8 @@
+// Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use std::{
     fs::{self, OpenOptions},
     io::{BufRead, BufReader, Write},
@@ -51,6 +53,72 @@ fn list_files(root: String) -> Result<Vec<String>, String> {
         files.push(path.to_string_lossy().to_string());
     }
     Ok(files)
+}
+
+#[tauri::command]
+fn find_logseq_graphs() -> Result<Vec<String>, String> {
+    let mut graphs = Vec::new();
+    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+    
+    // Check ~/logseq/graphs (DB-based graphs)
+    let db_graphs_dir = PathBuf::from(&home).join("logseq").join("graphs");
+    if db_graphs_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&db_graphs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    graphs.push(path.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+    
+    // Check common locations for file-based graphs
+    let common_dirs = vec![
+        PathBuf::from(&home).join("Documents"),
+        PathBuf::from(&home).join("Desktop"),
+    ];
+    
+    for base_dir in common_dirs {
+        if let Ok(entries) = fs::read_dir(&base_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let logseq_dir = path.join(".logseq");
+                    if logseq_dir.exists() && logseq_dir.is_dir() {
+                        graphs.push(path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(graphs)
+}
+
+#[derive(Debug, Serialize)]
+struct FileMetadata {
+    path: String,
+    mtimeMs: f64,
+}
+
+#[tauri::command]
+fn stat_files_batch(paths: Vec<String>) -> Result<Vec<FileMetadata>, String> {
+    let mut results = Vec::new();
+    for path_str in paths {
+        let path = PathBuf::from(&path_str);
+        if let Ok(meta) = fs::metadata(&path) {
+            if let Ok(modified) = meta.modified() {
+                if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+                    results.push(FileMetadata {
+                        path: path_str,
+                        mtimeMs: duration.as_secs_f64() * 1000.0,
+                    });
+                }
+            }
+        }
+    }
+    Ok(results)
 }
 
 #[tauri::command]
@@ -242,10 +310,22 @@ fn current_timestamp_ms() -> u64 {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            #[cfg(debug_assertions)]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_files,
             read_file,
             stat_file,
+            stat_files_batch,
+            find_logseq_graphs,
             apply_transaction,
             reindex_graph,
             verify_graph,

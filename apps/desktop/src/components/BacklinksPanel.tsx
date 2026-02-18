@@ -34,24 +34,33 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({
     <aside className="backlinks-panel">
       <header>
         <h3>Backlinks</h3>
-        <button type="button" onClick={onClose}>
-          Close
+        <button type="button" className="logseq-button" onClick={onClose}>
+          ✕
         </button>
       </header>
-      {links.length === 0 ? (
-        <p>No backlinks yet.</p>
-      ) : (
-        <ul>
-          {links.map((link: Backlink, index: number) => (
-            <li key={`${link.sourcePage}-${link.sourceBlockId ?? index}`}>
-              <button type="button" onClick={() => onSelectPage(link.sourcePage)}>
-                {link.sourcePage}
-                {link.sourceBlockId ? ` · ${link.sourceBlockId}` : ''}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="backlinks-content">
+        {links.length === 0 ? (
+          <div className="logseq-empty-state">
+            <p>No backlinks yet.</p>
+            <p style={{ fontSize: '12px', opacity: 0.7, marginTop: '8px' }}>
+              Pages that link to this page will appear here.
+            </p>
+          </div>
+        ) : (
+          <ul>
+            {links.map((link: Backlink, index: number) => (
+              <li key={`${link.sourcePage}-${link.sourceBlockId ?? index}`}>
+                <button type="button" onClick={() => onSelectPage(link.sourcePage)}>
+                  <span className="backlink-page">{link.sourcePage}</span>
+                  {link.sourceBlockId && (
+                    <span className="backlink-block">Block: {link.sourceBlockId.slice(0, 8)}...</span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </aside>
   );
 };

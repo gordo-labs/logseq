@@ -11,6 +11,9 @@ export default defineConfig({
       '@logseq/fs-adapter': fileURLToPath(new URL('../../packages/fs-adapter/src/types.ts', import.meta.url))
     }
   },
+  optimizeDeps: {
+    include: ['@tauri-apps/api']
+  },
   server: {
     port: 1420,
     strictPort: true,

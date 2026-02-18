@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import path from './browser-path.js';
 
 export interface WalEntry {
   ops: { path: string; content: string }[];

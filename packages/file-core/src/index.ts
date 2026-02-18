@@ -1,3 +1,4 @@
-export { createFileCore } from './core.js';
-export { watchGraph } from './watch.js';
-export type { FileCore } from './read.js';
+export { createFileCore, createFileCoreLazy } from './core.js';
+// watchGraph disabled for browser compatibility
+// export { watchGraph } from './watch.js';
+export type { FileCore, LazyFileCore } from './read.js';

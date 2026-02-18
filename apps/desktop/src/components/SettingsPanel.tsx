@@ -1,6 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { open as openDialog } from '@tauri-apps/api/dialog';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useGraph } from '../state/GraphProvider';
+
+// Dynamically import Tauri API to avoid module load errors
+type InvokeFunction = <T = any>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+let invoke: InvokeFunction;
+
+async function initTauriApi() {
+  try {
+    const tauriApi = await import('@tauri-apps/api');
+    if (tauriApi && (tauriApi as any).core && (tauriApi as any).core.invoke) {
+      invoke = (tauriApi as any).core.invoke;
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to load Tauri API:', err);
+  }
+  // Fallback that will throw when called
+  invoke = (() => {
+    throw new Error('Tauri API not available. Make sure you are running in a Tauri environment.');
+  }) as InvokeFunction;
+  return false;
+}
+
+// Initialize immediately
+initTauriApi();
 import type { OpsLogEntry } from '../types/system';
 
 interface SettingsPanelProps {
@@ -13,10 +37,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ open, onClose }: S
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<OpsLogEntry[]>([]);
+  const [foundGraphs, setFoundGraphs] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
     readHistory(50).then(entries => setHistory(entries));
+    (async () => {
+      try {
+        if (!invoke || typeof invoke !== 'function') {
+          await initTauriApi();
+        }
+        const graphs = await invoke<string[]>('find_logseq_graphs');
+        setFoundGraphs(graphs);
+      } catch {
+        setFoundGraphs([]);
+      }
+    })();
   }, [open, readHistory]);
 
   if (!open) return null;
@@ -61,9 +97,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ open, onClose }: S
         <section>
           <h3>Graph root</h3>
           <p className="settings-path">{root ?? 'No graph selected'}</p>
-          <button type="button" onClick={chooseRoot}>
-            Choose folder…
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {foundGraphs.length > 0 && (
+              <div>
+                <p style={{ fontSize: '0.85rem', marginBottom: '8px' }}>Found Logseq graphs:</p>
+                {foundGraphs.map((graphPath) => (
+                  <button
+                    key={graphPath}
+                    type="button"
+                    onClick={() => {
+                      setRoot(graphPath);
+                      setStatus(`Graph root set to ${graphPath}`);
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '6px 8px',
+                      marginBottom: '4px',
+                      background: graphPath === root ? 'rgba(99, 102, 241, 0.2)' : 'rgba(148, 163, 184, 0.1)',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      wordBreak: 'break-all'
+                    }}
+                  >
+                    {graphPath}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button type="button" onClick={chooseRoot}>
+              Choose folder…
+            </button>
+          </div>
         </section>
         <section>
           <h3>Maintenance</h3>

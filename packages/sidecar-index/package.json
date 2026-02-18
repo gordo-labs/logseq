@@ -1,6 +1,5 @@
 {
   "name": "@logseq/sidecar-index",
-<<<<<<< ours
   "version": "0.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -18,13 +17,5 @@
   "dependencies": {
     "sql.js": "^1.9.0",
     "@logseq/model": "workspace:*"
-=======
-  "version": "0.0.1",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.json"
->>>>>>> theirs
   }
 }

@@ -1,7 +1,8 @@
+import path from './browser-path.js';
 import type { FsAdapter } from '@logseq/fs-adapter';
 import { Backlink } from '@logseq/model';
 import { parseFile } from './parse.js';
-import { InMemoryFileCore, Indices } from './read.js';
+import { InMemoryFileCore, Indices, LazyFileCore } from './read.js';
 
 export async function createFileCore(root: string, adapter: FsAdapter) {
   const files = await adapter.listFiles(root);
@@ -40,4 +41,32 @@ export async function createFileCore(root: string, adapter: FsAdapter) {
   }
 
   return new InMemoryFileCore(indices);
+}
+
+export async function createFileCoreLazy(root: string, adapter: FsAdapter): Promise<LazyFileCore> {
+  const indices: Indices = {
+    pageByTitle: new Map(),
+    blocksById: new Map(),
+    childrenByParent: new Map(),
+    backlinks: new Map()
+  };
+
+  const fileMap = new Map<string, string>();
+  const fileStats = new Map<string, { mtimeMs: number }>();
+
+  // List and index all markdown files
+  const files = await adapter.listFiles(root);
+  const mdFiles = files.filter((f: string) => f.endsWith('.md'));
+  
+  for (const file of mdFiles) {
+    const stat = await adapter.stat(file);
+    fileStats.set(file, stat);
+    const filename = path.basename(file);
+    const title = filename.replace(/\.md$/, '');
+    const page: { id: string; title: string; path: string } = { id: title, title, path: file };
+    indices.pageByTitle.set(title, page);
+    fileMap.set(file, title);
+  }
+
+  return new LazyFileCore(indices, root, adapter, fileMap, fileStats);
 }

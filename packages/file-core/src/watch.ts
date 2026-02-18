@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
-import type { FsAdapter, WatchEvent, Watcher } from '@logseq/fs-adapter';
+import type { FsAdapter, WatchHandler } from '@logseq/fs-adapter';
+
+type WatchEvent = 'add' | 'change' | 'unlink';
 import { parseFile, type ParsedData } from './parse.js';
 import { detectConflicts, merge, type Conflict } from './conflicts.js';
 
@@ -15,12 +17,12 @@ export interface WatchOptions {
   onConflict?: (conflict: Conflict) => void;
 }
 
-function calcFingerprint(content: string, stat: { mtimeMs: number; size: number }): Fingerprint {
+function calcFingerprint(content: string, stat: { mtimeMs: number }): Fingerprint {
   const hash = crypto.createHash('sha1').update(content).digest('hex');
-  return { mtime: stat.mtimeMs, size: stat.size, hash };
+  return { mtime: stat.mtimeMs, size: content.length, hash };
 }
 
-export function watchGraph(adapter: FsAdapter, dir: string, opts: WatchOptions = {}): Watcher {
+export function watchGraph(adapter: FsAdapter, dir: string, opts: WatchOptions = {}): Promise<() => void> {
   const fps = new Map<string, Fingerprint>();
   const parsed = new Map<string, ParsedData>();
 
@@ -31,12 +33,12 @@ export function watchGraph(adapter: FsAdapter, dir: string, opts: WatchOptions =
     }
   }
 
-  const handler = async (evt: WatchEvent) => {
-    if (evt.type !== 'change') return;
-    const file = evt.path;
+  const handler: WatchHandler = async (evt: WatchEvent, path: string) => {
+    if (evt !== 'change') return;
+    const file = path;
     const content = await adapter.readFile(file);
     const stat = await adapter.stat(file);
-    const fp = calcFingerprint(content, stat as any);
+    const fp = calcFingerprint(content, stat);
     const prev = fps.get(file);
     if (prev && prev.mtime === fp.mtime && prev.size === fp.size && prev.hash === fp.hash) {
       return;
@@ -59,6 +61,5 @@ export function watchGraph(adapter: FsAdapter, dir: string, opts: WatchOptions =
     opts.onUpdate?.(file, nextParsed);
   };
 
-  const watcher = adapter.watch(dir, handler);
-  return watcher;
+  return adapter.watch(dir, handler);
 }
